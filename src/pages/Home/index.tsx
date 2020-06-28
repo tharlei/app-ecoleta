@@ -1,19 +1,53 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Feather as Icon } from '@expo/vector-icons';
 import { View, Image, ImageBackground, StyleSheet, Text, KeyboardAvoidingView, Platform } from 'react-native';
 import { RectButton } from 'react-native-gesture-handler';
 import { useNavigation } from '@react-navigation/native';
 import RNPickerSelect from 'react-native-picker-select';
+import axios from 'axios';
+
+interface IBGEUFResponse {
+  sigla: string
+}
+
+interface IBGECityResponse {
+  nome: string
+}
 
 const Home = () => {
   const navigation = useNavigation();
 
-  const [uf, setUf] = useState<string>('');
-  const [city, setCity] = useState<string>('');
+  const [ufs, setUfs] = useState<string[]>([]);
+  const [selectedUf, setSelectedUf] = useState<string>('');
+
+  const [cities, setCities] = useState<string[]>([]);
+  const [selectedCity, setSelectedCity] = useState<string>('');
 
   function handleNavigateToPoints() {
-    navigation.navigate('Points', { uf, city });
+    navigation.navigate('Points', { selectedUf, selectedCity });
   }
+
+  useEffect(() => {
+    axios.get<IBGEUFResponse[]>('https://servicodados.ibge.gov.br/api/v1/localidades/estados')
+      .then(res => {
+        const ufInitials = res.data.map(uf => uf.sigla);
+        setUfs(ufInitials);
+      })
+  }, [])
+
+  useEffect(() => {
+    setSelectedCity('');
+    if (selectedUf === '0') {
+      setCities([]);
+      return;
+    }
+
+    axios.get<IBGECityResponse[]>(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${selectedUf}/municipios`)
+      .then(res => {
+        const citiesInitials = res.data.map(city => city.nome);
+        setCities(citiesInitials);
+      })
+  }, [selectedUf])
 
   return (
     <KeyboardAvoidingView
@@ -39,18 +73,26 @@ const Home = () => {
 
         <View style={styles.footer}>
           <RNPickerSelect
-            onValueChange={(value) => setCity(value)}
-            items={[
-              { label: 'Araçariguama', value: 'Araçariguama' },
-            ]}
+            placeholder={{
+              label: 'Estado'
+            }}
+            onValueChange={(value) => setSelectedUf(value)}
+            items={ufs.map(uf => ({ label: uf, value: uf }))}
           />
           <RNPickerSelect
-            onValueChange={(value) => setUf(value)}
-            items={[
-              { label: 'SP', value: 'SP' },
-            ]}
+            placeholder={{
+              label: 'Cidade'
+            }}
+            disabled={!cities.length}
+            onValueChange={(value) => setSelectedCity(value)}
+            items={cities.map(city => ({ label: city, value: city }))}
           />
-          <RectButton style={styles.button} onPress={handleNavigateToPoints}>
+
+          <RectButton
+            style={styles.button}
+            onPress={handleNavigateToPoints}
+            enabled={!!selectedCity}
+          >
             <View style={styles.buttonIcon}>
               <Text>
                 <Icon name="arrow-right" color="#FFF" size={24} />
